@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - TNC Gestão{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Cabeçalho do Dashboard -->
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2"><i class="bi bi-speedometer2"></i> Dashboard Analítico</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <div class="btn-group me-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshDashboard()">
+                    <i class="bi bi-arrow-clockwise"></i> Atualizar
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="exportDashboard()">
+                    <i class="bi bi-download"></i> Exportar
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Cartões de KPIs -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total de TNCs</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.total_tncs }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-list-task fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">TNCs Abertas</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.tncs_abertas }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">TNCs Concluídas</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.tncs_concluidas }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Valor Total</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">R$ {{ "%.2f"|format(stats.valor_total) }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-currency-dollar fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Gráficos -->
+    <div class="row">
+        <!-- TNCs por Gravidade -->
+        <div class="col-xl-4 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">TNCs por Gravidade</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="gravidade-chart" width="400" height="400"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- TNCs por Status -->
+        <div class="col-xl-4 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">TNCs por Status</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="status-chart" width="400" height="400"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- TNCs por Disciplina -->
+        <div class="col-xl-4 col-lg-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">TNCs por Disciplina (Top 10)</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="disciplina-chart" width="400" height="400"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Evolução Temporal e Projetos -->
+    <div class="row">
+        <!-- Evolução Mensal -->
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Evolução Mensal das TNCs</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="evolucao-chart" width="800" height="400"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- TNCs por Projeto -->
+        <div class="col-xl-4 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">TNCs por Projeto (Top 5)</h6>
+                </div>
+                <div class="card-body">
+                    {% for projeto_nome, count, valor in tncs_projeto[:5] %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span class="text-truncate">{{ projeto_nome }}</span>
+                            <span class="badge bg-primary">{{ count }}</span>
+                        </div>
+                        <small class="text-muted">Valor: R$ {{ "%.2f"|format(valor or 0) }}</small>
+                        <div class="progress mt-1">
+                            <div class="progress-bar" role="progressbar" 
+                                 style="width: {{ (count / stats.total_tncs * 100) if stats.total_tncs > 0 else 0 }}%">
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.border-left-primary {
+    border-left: .25rem solid #4e73df!important;
+}
+.border-left-warning {
+    border-left: .25rem solid #f6c23e!important;
+}
+.border-left-success {
+    border-left: .25rem solid #1cc88a!important;
+}
+.border-left-info {
+    border-left: .25rem solid #36b9cc!important;
+}
+.text-xs {
+    font-size: .7rem;
+}
+.text-gray-300 {
+    color: #dddfeb!important;
+}
+.text-gray-800 {
+    color: #5a5c69!important;
+}
+.fa-2x {
+    font-size: 2em;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Dados dos gráficos
+const gravidadeData = {
+    labels: [{% for gravidade, count in tncs_gravidade %}'{{ gravidade }}'{% if not loop.last %},{% endif %}{% endfor %}],
+    datasets: [{
+        data: [{% for gravidade, count in tncs_gravidade %}{{ count }}{% if not loop.last %},{% endif %}{% endfor %}],
+        backgroundColor: ['#dc3545', '#ffc107', '#28a745']
+    }]
+};
+
+const statusData = {
+    labels: [{% for status, count in tncs_status %}'{{ status }}'{% if not loop.last %},{% endif %}{% endfor %}],
+    datasets: [{
+        data: [{% for status, count in tncs_status %}{{ count }}{% if not loop.last %},{% endif %}{% endfor %}],
+        backgroundColor: ['#dc3545', '#ffc107', '#28a745']
+    }]
+};
+
+const disciplinaData = {
+    labels: [{% for nome, count in tncs_disciplina %}'{{ nome[:15] }}...'{% if not loop.last %},{% endif %}{% endfor %}],
+    datasets: [{
+        data: [{% for nome, count in tncs_disciplina %}{{ count }}{% if not loop.last %},{% endif %}{% endfor %}],
+        backgroundColor: '#4e73df'
+    }]
+};
+
+const evolucaoData = {
+    labels: [{% for mes, count in evolucao_mensal %}'{{ mes }}'{% if not loop.last %},{% endif %}{% endfor %}],
+    datasets: [{
+        label: 'TNCs Criadas',
+        data: [{% for mes, count in evolucao_mensal %}{{ count }}{% if not loop.last %},{% endif %}{% endfor %}],
+        borderColor: '#4e73df',
+        backgroundColor: 'rgba(78, 115, 223, 0.1)',
+        tension: 0.3
+    }]
+};
+
+// Configurações dos gráficos
+const pieConfig = {
+    type: 'pie',
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+};
+
+const barConfig = {
+    type: 'bar',
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+};
+
+const lineConfig = {
+    type: 'line',
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: true
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+};
+
+// Criar gráficos
+document.addEventListener('DOMContentLoaded', function() {
+    // Gráfico de Gravidade
+    new Chart(document.getElementById('gravidade-chart'), {
+        ...pieConfig,
+        data: gravidadeData
+    });
+    
+    // Gráfico de Status
+    new Chart(document.getElementById('status-chart'), {
+        ...pieConfig,
+        data: statusData
+    });
+    
+    // Gráfico de Disciplina
+    new Chart(document.getElementById('disciplina-chart'), {
+        ...barConfig,
+        data: disciplinaData
+    });
+    
+    // Gráfico de Evolução
+    new Chart(document.getElementById('evolucao-chart'), {
+        ...lineConfig,
+        data: evolucaoData
+    });
+});
+
+// Funções auxiliares
+function refreshDashboard() {
+    location.reload();
+}
+
+function exportDashboard() {
+    window.open('{{ url_for("reports.dashboard_pdf") }}', '_blank');
+}
+</script>
+{% endblock %}
