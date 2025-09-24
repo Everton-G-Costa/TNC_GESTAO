@@ -1,7 +1,182 @@
 """
-Aplicação Principal - TNC Gestão
-Sistema Desktop para Gestão de Tratativas de Não Conformidades
+TNC GESTÃO - Sistema Web para Gestão de TNCs
+Sistema principal Flask
 """
+
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager
+from flask_migrate import Migrate
+import os
+from pathlib import Path
+
+# Initialize extensions
+db = SQLAlchemy()
+login_manager = LoginManager()
+migrate = Migrate()
+
+def create_app(config_name=None):
+    """Factory function to create Flask app"""
+    app = Flask(__name__)
+    
+    # Configure app
+    if config_name is None:
+        config_name = os.environ.get('FLASK_CONFIG', 'development')
+    
+    # Basic configuration
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///data/tnc_gestao.db')
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    
+    # Create data directories
+    data_dirs = [
+        'data/database',
+        'data/exports/pdf',
+        'data/exports/excel',
+        'data/exports/csv',
+        'data/backups',
+        'data/uploads',
+        'static/uploads',
+        'static/reports'
+    ]
+    
+    for directory in data_dirs:
+        Path(directory).mkdir(parents=True, exist_ok=True)
+    
+    # Initialize extensions with app
+    db.init_app(app)
+    login_manager.init_app(app)
+    migrate.init_app(app, db)
+    
+    # Configure login manager
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message = 'Por favor, faça login para acessar esta página.'
+    login_manager.login_message_category = 'info'
+    
+    # User loader for Flask-Login
+    from app.models.user import User
+    
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.query.get(int(user_id))
+    
+    # Register blueprints
+    from app.main.routes import bp as main_bp
+    app.register_blueprint(main_bp)
+    
+    from app.auth.routes import bp as auth_bp
+    app.register_blueprint(auth_bp, url_prefix='/auth')
+    
+    from app.tnc.routes import bp as tnc_bp
+    app.register_blueprint(tnc_bp, url_prefix='/tnc')
+    
+    from app.dashboard.routes import bp as dashboard_bp
+    app.register_blueprint(dashboard_bp, url_prefix='/dashboard')
+    
+    # Create sample data if database is empty
+    with app.app_context():
+        db.create_all()
+        
+        # Check if we have users
+        if User.query.count() == 0:
+            from werkzeug.security import generate_password_hash
+            
+            # Create admin user
+            admin = User(
+                username='admin',
+                email='admin@tnc-gestao.com',
+                name='Administrador',
+                password_hash=generate_password_hash('admin123'),
+                is_admin=True,
+                is_inspector=True,
+                is_viewer=True
+            )
+            
+            # Create sample inspector
+            inspector = User(
+                username='inspetor',
+                email='inspetor@tnc-gestao.com',
+                name='Inspetor TNC',
+                password_hash=generate_password_hash('inspetor123'),
+                is_inspector=True,
+                is_viewer=True
+            )
+            
+            db.session.add(admin)
+            db.session.add(inspector)
+            
+            # Create sample companies
+            from app.models.empresa import Empresa
+            
+            empresas = [
+                Empresa(nome='Petrobras S.A.', cnpj='33.000.167/0001-01', email='contato@petrobras.com.br', ativa=True),
+                Empresa(nome='Vale S.A.', cnpj='33.592.510/0001-54', email='contato@vale.com', ativa=True),
+                Empresa(nome='Construtora ABC Ltda.', cnpj='12.345.678/0001-90', email='contato@abc.com.br', ativa=True),
+            ]
+            
+            for empresa in empresas:
+                db.session.add(empresa)
+            
+            # Create sample disciplines
+            from app.models.disciplina import Disciplina
+            
+            disciplinas = [
+                Disciplina(nome='Estruturas', codigo='EST', descricao='Disciplina de estruturas'),
+                Disciplina(nome='Elétrica', codigo='ELE', descricao='Disciplina elétrica'),
+                Disciplina(nome='Mecânica', codigo='MEC', descricao='Disciplina mecânica'),
+                Disciplina(nome='Instrumentação', codigo='INS', descricao='Disciplina de instrumentação'),
+                Disciplina(nome='Processo', codigo='PRO', descricao='Disciplina de processo'),
+            ]
+            
+            for disciplina in disciplinas:
+                db.session.add(disciplina)
+            
+            db.session.commit()
+            print("✅ Dados de exemplo criados!")
+            print("👤 Login Admin: admin / admin123")
+            print("👤 Login Inspetor: inspetor / inspetor123")
+    
+    return app
+
+def show_startup_intro():
+    """Exibe introdução na inicialização do sistema"""
+    print("=" * 80)
+    print("🌐 TNC GESTÃO - SISTEMA WEB DE GESTÃO DE TNCs")
+    print("=" * 80)
+    print()
+    print("🚀 INICIALIZANDO SISTEMA WEB...")
+    print("   • Configurando servidor Flask")
+    print("   • Inicializando banco de dados SQLite")
+    print("   • Preparando dashboard analítico web")
+    print("   • Configurando geração de relatórios PDF")
+    print("   • Configurando autenticação e controle de acesso")
+    print()
+    print("📊 FUNCIONALIDADES DISPONÍVEIS:")
+    print("   ✅ Dashboard web interativo com gráficos")
+    print("   ✅ Gestão completa de TNCs via web")
+    print("   ✅ Sistema de autenticação (Admin, Inspetor, Visualizador)")
+    print("   ✅ Relatórios PDF profissionais")
+    print("   ✅ Importação/Exportação Excel/CSV")
+    print("   ✅ API REST para integrações")
+    print()
+    print("🌐 ACESSO:")
+    print("   • URL: http://localhost:5000")
+    print("   • Login Admin: admin / admin123")
+    print("   • Login Inspetor: inspetor / inspetor123")
+    print()
+    print("👨‍💻 Sistema Web Responsivo | 📅 Versão 2025.01")
+    print("=" * 80)
+    print()
+
+if __name__ == '__main__':
+    # Exibir introdução
+    show_startup_intro()
+    
+    # Criar aplicação Flask
+    app = create_app()
+    
+    # Executar em modo desenvolvimento
+    app.run(debug=True, host='0.0.0.0', port=5000)
 
 import sys
 import os
